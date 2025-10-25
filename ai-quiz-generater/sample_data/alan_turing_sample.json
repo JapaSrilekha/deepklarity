@@ -1,0 +1,54 @@
+{
+  "source_title": "Alan Turing",
+  "source_url": "https://en.wikipedia.org/wiki/Alan_Turing",
+  "summary": "Alan Turing was a British mathematician and computer scientist who made foundational contributions to computer science, artificial intelligence, and cryptanalysis...",
+  "key_entities": {
+    "people": [
+      "Alan Turing",
+      "Alonzo Church"
+    ],
+    "organizations": [
+      "Bletchley Park",
+      "University of Cambridge"
+    ],
+    "locations": [
+      "United Kingdom"
+    ]
+  },
+  "sections": [
+    "Early life",
+    "World War II",
+    "Legacy"
+  ],
+  "quiz": [
+    {
+      "question": "Where did Alan Turing study mathematics?",
+      "options": [
+        "Harvard University",
+        "University of Cambridge",
+        "Oxford University",
+        "Princeton University"
+      ],
+      "answer": "University of Cambridge",
+      "explanation": "Turing studied at Cambridge; this is mentioned in the Early life section.",
+      "difficulty": "easy"
+    },
+    {
+      "question": "What was one of Turing's key contributions during WWII?",
+      "options": [
+        "Atomic research",
+        "Breaking the Enigma code",
+        "Radar development",
+        "Jet engine design"
+      ],
+      "answer": "Breaking the Enigma code",
+      "explanation": "He worked at Bletchley Park on breaking Enigma.",
+      "difficulty": "medium"
+    }
+  ],
+  "related_topics": [
+    "Cryptography",
+    "Enigma machine",
+    "History of computing"
+  ]
+}
