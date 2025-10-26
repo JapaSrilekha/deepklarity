@@ -4,11 +4,32 @@ from typing import Dict, Any
 from langchain_core.output_parsers.pydantic import PydanticOutputParser
 from langchain_core.prompts.prompt import PromptTemplate
 from .schemas import QuizOut
-# langchain-google-genai import; may need to adjust based on package version
-try:
-    from langchain_google_genai import GoogleGemini
-except Exception:
-    GoogleGemini = None
+# langchain-google-genai import; try multiple known package paths at runtime to avoid
+# static import errors in editors/linters and to support different installed versions.
+GoogleGemini = None
+import importlib
+
+_candidate_modules = [
+    "langchain_google_genai",
+    "langchain.google_genai",
+    "langchain.experimental.generative.google_gemini",
+    "google_genai",
+    "google.generativeai",
+]
+
+for _mod in _candidate_modules:
+    try:
+        mod = importlib.import_module(_mod)
+        # Common attribute names that might expose the Gemini client/class
+        for attr in ("GoogleGemini", "Gemini", "GoogleGeminiLLM", "GeminiAPI"):
+            if hasattr(mod, attr):
+                GoogleGemini = getattr(mod, attr)
+                break
+        if GoogleGemini is not None:
+            break
+    except Exception:
+        # Ignore import errors and try the next candidate
+        continue
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
 MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-mini")

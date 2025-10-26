@@ -1,4 +1,4 @@
-C:\path\to\venv\Scripts\python.exe -m pip install --upgrade pip setuptools
+
 
 try:
     from setuptools import setup, find_packages

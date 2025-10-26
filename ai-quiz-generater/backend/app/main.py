@@ -10,6 +10,7 @@ from app.scraper import scrape_wikipedia
 from app.llm import generate_quiz_from_text
 from app.crud import create_quiz, list_history, get_quiz
 from app.utils import get_db
+from app.sanitizer import sanitize_html, extract_text_content
 load_dotenv()
 ModelsBase.metadata.create_all(bind=engine)
 app = FastAPI(title="DeepKlarity AI Wiki Quiz Generator")
@@ -48,87 +49,44 @@ async def generate_quiz(req: GenerateRequest, db: Session = Depends(get_db)):
     """Generate a quiz from a Wikipedia URL."""
     # Convert Pydantic HttpUrl to string
     req_url_str = str(req.url)
-    
+    # Import here to avoid startup import-time side-effects
+    from app.scraper import scrape_wikipedia
+    from app.llm import generate_quiz_from_text
+
+    # Scrape the article
     try:
-        from app.scraper import scrape_wikipedia
-        from app.llm import generate_quiz_from_text
-        
-        # Get the article content
-        try:
-            title, html, cleaned, sections = scrape_wikipedia(req_url_str)
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Failed to scrape article: {str(e)}"
-            )
-            
-        # Generate the quiz
-        try:
-            quiz_json = generate_quiz_from_text(title=title, url=req_url_str, article_text=cleaned)
-            quiz_json["sections"] = sections
-            quiz_json["source_title"] = title
-            quiz_json["source_url"] = req_url_str
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to generate quiz: {str(e)}"
-            )
-            
-        # Save to database
-        try:
-            db_item = create_quiz(
-                db=db,
-                url=req_url_str,
-                title=title,
-                scraped_html=html,
-                scraped_content=cleaned,
-                quiz_json=quiz_json
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to save quiz: {str(e)}"
-            )
-            
-        return quiz_json
-        
-    except HTTPException:
-        raise
+        title, html, cleaned, sections = scrape_wikipedia(req_url_str)
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unexpected error: {str(e)}"
+        raise HTTPException(status_code=400, detail=f"Failed to scrape article: {str(e)}")
+
+    # Generate the quiz JSON (may raise)
+    try:
+        quiz_json = generate_quiz_from_text(title=title, url=req_url_str, article_text=cleaned)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate quiz: {str(e)}")
+
+    # Ensure metadata fields
+    quiz_json.setdefault("sections", sections or [])
+    quiz_json.setdefault("source_title", title)
+    quiz_json.setdefault("source_url", req_url_str)
+
+    # Sanitize HTML before saving
+    sanitized_html = sanitize_html(html)
+
+    # Save to DB
+    try:
+        db_item = create_quiz(
+            db=db,
+            url=req_url_str,
+            title=title,
+            scraped_html=sanitized_html,
+            scraped_content=cleaned,
+            quiz_json=quiz_json,
         )
-
-        try:
-            print("DEBUG: Starting quiz generation")  # Debug log
-            quiz_json = generate_quiz_from_text(title=title, url=req_url_str, article_text=cleaned)
-            print("DEBUG: Quiz generation successful")  # Debug log
-        except Exception as e:
-            print(f"DEBUG: Quiz generation failed: {str(e)}")  # Debug log
-            traceback.print_exc()  # Print full traceback for debugging
-            raise HTTPException(status_code=500, detail=f"LLM generation failed: {str(e)}")
-
-        quiz_json["sections"] = sections if sections else quiz_json.get("sections", [])
-        quiz_json["source_title"] = title
-        quiz_json["source_url"] = req_url_str
-
-        try:
-            print("DEBUG: Saving to database")  # Debug log
-            db_item = create_quiz(db=db, url=req_url_str, title=title, scraped_html=html, scraped_content=cleaned, quiz_json=quiz_json)
-            print("DEBUG: Save successful")  # Debug log
-        except Exception as e:
-            print(f"DEBUG: Database save failed: {str(e)}")  # Debug log
-            traceback.print_exc()  # Print full traceback for debugging
-            raise HTTPException(status_code=500, detail=f"Database save failed: {str(e)}")
-
-        return quiz_json
-
-    except HTTPException:
-        raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
-        # Catch any unexpected errors and convert to 500
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save quiz: {str(e)}")
+
+    return quiz_json
 @app.get("/history")
 def history(db: Session = Depends(get_db)):
     items = list_history(db)
